@@ -1,0 +1,717 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>SyncoBeat</title>
+  <style>
+    :root {
+      /* Mango yellow-orange palette (dark) */
+      --bg: #1a1408;
+      --panel: #241c0f;
+      --text: #fff4dc;
+      --muted: #b9a485;
+      --accent: #ff9a3c;        /* mango orange */
+      --accent-soft: #ffc657;   /* mango yellow */
+      --accent-dim: #3d2a12;
+      --accent-fg: #1a1408;
+      --border: #2e2514;
+      --track: #2e2514;
+      --green: #5dd39e;
+      --amber: #ffc657;
+      --red: #ff6b5e;
+      --grey: #7a6853;
+    }
+    @media (prefers-color-scheme: light) {
+      :root {
+        --bg: #fff7e8;
+        --panel: #ffffff;
+        --text: #2b1d0f;
+        --muted: #85705a;
+        --accent: #f7891a;
+        --accent-soft: #ffb347;
+        --accent-dim: #ffe2b8;
+        --accent-fg: #ffffff;
+        --border: #f2e4c9;
+        --track: #f2e4c9;
+        --green: #16a34a;
+        --amber: #d97706;
+        --red: #dc2626;
+        --grey: #b39c7f;
+      }
+    }
+
+    *, *::before, *::after { box-sizing: border-box; }
+    html, body {
+      margin: 0;
+      padding: 0;
+      width: 340px;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+    }
+    body { padding: 12px; overflow: visible; }
+
+    header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      margin-bottom: 8px;
+    }
+    header .brand {
+      display: flex; align-items: center; gap: 8px;
+      font-weight: 700; font-size: 16px; letter-spacing: 0.2px;
+      background: linear-gradient(90deg, var(--accent-soft), var(--accent));
+      -webkit-background-clip: text; background-clip: text;
+      color: transparent;
+      flex: 0 0 auto;
+    }
+    header .brand .logo { font-size: 18px; -webkit-text-fill-color: initial; }
+
+    .status {
+      display: flex; align-items: center; gap: 6px;
+      font-size: 12px; color: var(--muted);
+      min-width: 0;
+    }
+    .status .dot {
+      width: 10px; height: 10px; border-radius: 50%;
+      background: var(--grey);
+      box-shadow: 0 0 0 2px rgba(255,255,255,0.04);
+      flex: 0 0 10px;
+    }
+    .status #status-text {
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+    .status.synced .dot { background: var(--green); }
+    .status.paused .dot { background: var(--amber); }
+    .status.none   .dot { background: var(--grey); }
+
+    .panel {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 10px 12px;
+      margin-bottom: 8px;
+      overflow: visible;
+    }
+
+    .bpm-display {
+      display: flex; align-items: baseline; justify-content: center;
+      gap: 6px;
+      margin: 2px 0 6px;
+    }
+    .bpm-display .bpm {
+      font-size: 44px; font-weight: 800; line-height: 1;
+      letter-spacing: -1px;
+      background: linear-gradient(135deg, var(--accent-soft), var(--accent));
+      -webkit-background-clip: text; background-clip: text;
+      color: transparent;
+      cursor: text;
+      border-radius: 6px;
+    }
+    .bpm-display .bpm:focus-visible { outline: 2px solid var(--accent-soft); }
+    .bpm-display .bpm-input {
+      width: 120px;
+      font-size: 44px; font-weight: 800; line-height: 1;
+      letter-spacing: -1px;
+      text-align: center;
+      background: transparent;
+      color: var(--accent);
+      border: none; border-bottom: 2px solid var(--accent);
+      outline: none;
+      padding: 0;
+      font-family: inherit;
+      -moz-appearance: textfield;
+    }
+    .bpm-display .bpm-input::-webkit-outer-spin-button,
+    .bpm-display .bpm-input::-webkit-inner-spin-button {
+      -webkit-appearance: none; margin: 0;
+    }
+    .bpm-display .unit {
+      font-size: 13px; color: var(--muted);
+      text-transform: uppercase; letter-spacing: 1px;
+    }
+
+    /* Slider block: label + value/quick buttons on top row, − slider + below */
+    .slider-block { margin: 8px 0; }
+    .slider-head {
+      display: flex; align-items: center; justify-content: space-between;
+      margin-bottom: 4px;
+    }
+    .slider-head .label {
+      font-size: 12px; color: var(--muted);
+      display: inline-flex; align-items: center;
+    }
+    .slider-head .value {
+      font-size: 12px; color: var(--text);
+      font-variant-numeric: tabular-nums;
+      font-weight: 600;
+    }
+    .slider-control {
+      display: flex; align-items: center; gap: 8px;
+    }
+
+    .quick-btns { display: inline-flex; gap: 4px; }
+    .chip-mini {
+      background: transparent;
+      color: var(--muted);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 2px 8px;
+      font-size: 11px; font-weight: 700;
+      cursor: pointer;
+      line-height: 16px;
+      user-select: none;
+      transition: background 0.1s ease, color 0.1s ease;
+    }
+    .chip-mini:hover { background: var(--accent-dim); color: var(--accent); }
+    .chip-mini:active { transform: scale(0.95); }
+    .chip-mini.tap { color: var(--accent); border-color: var(--accent-dim); }
+    .chip-mini.tap.flash { background: var(--accent); color: var(--accent-fg); }
+
+    .row {
+      display: flex; align-items: center; gap: 8px;
+      margin: 8px 0;
+    }
+    .row > label {
+      font-size: 12px; color: var(--muted);
+      min-width: 60px;
+      display: inline-flex; align-items: center;
+    }
+
+    input[type="range"] {
+      flex: 1;
+      -webkit-appearance: none; appearance: none;
+      height: 4px; background: var(--track); border-radius: 4px;
+      outline: none;
+      min-width: 0;
+    }
+    input[type="range"]::-webkit-slider-thumb {
+      -webkit-appearance: none; appearance: none;
+      width: 16px; height: 16px; border-radius: 50%;
+      background: var(--accent); cursor: pointer;
+      border: 2px solid var(--panel);
+      box-shadow: 0 1px 3px rgba(0,0,0,0.25);
+    }
+    input[type="range"]::-moz-range-thumb {
+      width: 16px; height: 16px; border-radius: 50%;
+      background: var(--accent); cursor: pointer;
+      border: 2px solid var(--panel);
+    }
+
+    select {
+      background: var(--bg); color: var(--text);
+      border: 1px solid var(--border); border-radius: 6px;
+      padding: 4px 8px; font-size: 13px;
+      max-width: 100%;
+    }
+    .select-pair {
+      display: flex; gap: 6px; flex: 1; justify-content: flex-end;
+      min-width: 0;
+    }
+
+    /* iOS-style sliding toggle — rectangular corners to match the Mode
+       segmented control aesthetic. No text, just a sliding knob. */
+    .switch {
+      position: relative;
+      width: 42px; height: 24px;
+      background: var(--track);
+      border-radius: 6px;
+      cursor: pointer;
+      transition: background 0.22s cubic-bezier(0.4,0.0,0.2,1);
+      border: none; padding: 0;
+      flex: 0 0 42px;
+      display: inline-block;
+    }
+    .switch::after {
+      content: '';
+      position: absolute;
+      top: 2px; left: 2px;
+      width: 20px; height: 20px;
+      border-radius: 4px;
+      background: #fff;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.25), 0 1px 1px rgba(0,0,0,0.15);
+      transition: transform 0.22s cubic-bezier(0.4,0.0,0.2,1);
+    }
+    .switch.on { background: var(--accent); }
+    .switch.on::after { transform: translateX(18px); }
+    .switch:focus-visible { outline: 2px solid var(--accent-soft); outline-offset: 2px; }
+
+    .nudge-btn {
+      width: 28px; height: 28px;
+      flex: 0 0 28px;
+      display: inline-flex; align-items: center; justify-content: center;
+      background: transparent;
+      color: var(--text);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      font-size: 14px; font-weight: 700; line-height: 1;
+      cursor: pointer;
+      padding: 0;
+      user-select: none;
+      transition: background 0.1s ease, transform 0.05s ease;
+    }
+    .nudge-btn:hover { background: var(--accent-dim); color: var(--accent); border-color: var(--accent-dim); }
+    .nudge-btn:active { transform: scale(0.93); }
+
+    .accent-row { gap: 8px; }
+    .accent-row .accent-controls {
+      display: flex; align-items: center; gap: 6px; flex: 1; justify-content: flex-end;
+    }
+    .accent-row .accent-display {
+      font-size: 12px; color: var(--text);
+      min-width: 52px; text-align: center;
+      font-variant-numeric: tabular-nums;
+      font-weight: 600;
+    }
+    .bar-stepper {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+    .nudge-btn-sm {
+      width: 22px; height: 18px;
+      flex: 0 0 18px;
+      font-size: 11px;
+      border-radius: 4px;
+    }
+
+    .beats {
+      display: flex; justify-content: center; gap: 8px;
+      margin: 4px 0 2px;
+    }
+    .beat {
+      width: 15px; height: 15px; border-radius: 50%;
+      background: var(--border);
+      transition: background 0.08s linear, transform 0.08s linear;
+    }
+    .beat.active { background: var(--accent); transform: scale(1.2); }
+    .beat.accent.active {
+      background: var(--accent-soft);
+      box-shadow: 0 0 8px rgba(255,198,87,0.6);
+    }
+
+    .sig-row { justify-content: space-between; }
+
+    /* Mode segmented control (Auto / Manual) */
+    .mode-row { justify-content: space-between; }
+    .mode-segments {
+      display: inline-flex;
+      background: var(--track);
+      border-radius: 8px;
+      padding: 2px;
+    }
+    .mode-segments button {
+      border: none;
+      background: transparent;
+      color: var(--muted);
+      padding: 4px 14px;
+      border-radius: 6px;
+      font-size: 12px; font-weight: 600;
+      cursor: pointer;
+      transition: background 0.15s ease, color 0.15s ease;
+      user-select: none;
+    }
+    .mode-segments button:hover { color: var(--text); }
+    .mode-segments button.on {
+      background: linear-gradient(135deg, var(--accent-soft), var(--accent));
+      color: var(--accent-fg);
+    }
+
+    /* Manual transport (Start/Stop + Lock) */
+    .transport-row {
+      display: flex; gap: 8px;
+      margin: 8px 0;
+    }
+    .btn {
+      flex: 1;
+      background: transparent;
+      color: var(--text);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 7px 10px;
+      font-size: 12px; font-weight: 700;
+      cursor: pointer;
+      user-select: none;
+      transition: background 0.12s ease, color 0.12s ease, opacity 0.12s ease;
+    }
+    .btn:hover:not(:disabled) { background: var(--accent-dim); color: var(--accent); }
+    .btn:disabled { opacity: 0.4; cursor: not-allowed; }
+    .btn-primary {
+      background: linear-gradient(135deg, var(--accent-soft), var(--accent));
+      color: var(--accent-fg);
+      border-color: transparent;
+    }
+    .btn-primary:hover:not(:disabled) { background: var(--accent); color: var(--accent-fg); }
+
+    /* Hotkey rows (Manual mode) */
+    .hotkey-row {
+      display: flex; align-items: center; gap: 8px;
+      margin: 8px 0 4px;
+    }
+    .hotkey-row > label {
+      font-size: 12px; color: var(--muted);
+      min-width: 60px;
+      display: inline-flex; align-items: center;
+    }
+    .hotkey-row .spacer { flex: 1; }
+    .hotkey-badge {
+      display: inline-block;
+      padding: 3px 10px;
+      background: var(--bg);
+      color: var(--text);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      font-family: "SF Mono", ui-monospace, Menlo, monospace;
+      font-size: 12px; font-weight: 700;
+      min-width: 54px; text-align: center;
+      line-height: 18px;
+      font-variant-numeric: tabular-nums;
+      cursor: pointer;
+    }
+    .hotkey-badge.capturing {
+      background: var(--accent-dim);
+      color: var(--accent);
+      border-color: var(--accent);
+      animation: hk-pulse 1s ease-in-out infinite;
+    }
+    .hotkey-badge.confirmed {
+      background: var(--green);
+      color: #0a1a0a;
+      border-color: var(--green);
+      animation: hk-confirm 0.7s ease-out;
+    }
+    .hotkey-badge.error {
+      background: var(--red);
+      color: #fff;
+      border-color: var(--red);
+    }
+    @keyframes hk-pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.55; }
+    }
+    @keyframes hk-confirm {
+      0%   { transform: scale(0.85); }
+      40%  { transform: scale(1.15); }
+      100% { transform: scale(1); }
+    }
+    .hotkey-set {
+      background: transparent;
+      color: var(--accent);
+      border: 1px solid var(--accent-dim);
+      border-radius: 6px;
+      padding: 3px 10px;
+      font-size: 11px; font-weight: 600;
+      cursor: pointer;
+      line-height: 18px;
+      transition: background 0.1s ease;
+    }
+    .hotkey-set:hover { background: var(--accent-dim); }
+
+    .mode-caption {
+      font-size: 11px; color: var(--muted);
+      line-height: 1.35;
+      margin-top: 2px;
+    }
+    .mode-caption strong { color: var(--text); }
+
+    footer {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 2px 2px 0;
+    }
+    footer .enable-label {
+      font-size: 13px; color: var(--text); font-weight: 600;
+      display: inline-flex; align-items: center;
+    }
+
+    /* Tempo presets */
+    .preset-row {
+      display: flex; align-items: center; gap: 6px;
+      margin-top: 8px;
+      padding-top: 8px;
+      border-top: 1px solid var(--border);
+    }
+    .preset-chips {
+      display: flex; flex-wrap: wrap; gap: 6px;
+      align-items: center;
+      flex: 1;
+      min-height: 26px;
+    }
+    .preset-chips .empty {
+      font-size: 11px; color: var(--muted);
+      padding: 4px 2px; font-style: italic;
+    }
+    .chip-wrap {
+      position: relative;
+      display: inline-flex;
+    }
+    .chip {
+      background: transparent;
+      color: var(--text);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 4px 12px;
+      font-size: 12px; font-weight: 600;
+      cursor: pointer;
+      font-variant-numeric: tabular-nums;
+      transition: background 0.12s ease, color 0.12s ease, border-color 0.12s ease;
+      user-select: none;
+    }
+    .chip:hover {
+      background: var(--accent-dim);
+      border-color: var(--accent-dim);
+      color: var(--accent);
+    }
+    .chip.current {
+      background: linear-gradient(135deg, var(--accent-soft), var(--accent));
+      color: var(--accent-fg);
+      border-color: transparent;
+    }
+    .chip-del {
+      position: absolute;
+      top: -5px; right: -5px;
+      width: 16px; height: 16px;
+      border-radius: 50%;
+      background: var(--panel);
+      color: var(--muted);
+      border: 1px solid var(--border);
+      font-size: 10px; font-weight: 700; line-height: 1;
+      display: none;
+      align-items: center; justify-content: center;
+      cursor: pointer;
+      padding: 0;
+    }
+    .chip-wrap:hover .chip-del { display: inline-flex; }
+    .chip-del:hover {
+      background: var(--accent);
+      color: var(--accent-fg);
+      border-color: var(--accent);
+    }
+    .preset-save {
+      background: transparent;
+      color: var(--accent);
+      border: 1px solid var(--accent-dim);
+      border-radius: 14px;
+      padding: 4px 10px;
+      font-size: 11px; font-weight: 600;
+      cursor: pointer;
+      flex: 0 0 auto;
+      transition: background 0.1s ease;
+    }
+    .preset-save:hover:not(:disabled) { background: var(--accent-dim); }
+    .preset-save:disabled { opacity: 0.4; cursor: not-allowed; }
+
+    /* Info-icon hover tooltips */
+    .tip {
+      display: inline-flex;
+      width: 14px; height: 14px;
+      border-radius: 50%;
+      background: var(--track);
+      color: var(--muted);
+      font-size: 10px; font-weight: 700;
+      align-items: center; justify-content: center;
+      cursor: help;
+      margin-left: 5px;
+      position: relative;
+      font-family: Georgia, serif;
+      font-style: italic;
+      user-select: none;
+      transition: background 0.12s ease, color 0.12s ease;
+    }
+    .tip:hover, .tip:focus {
+      background: var(--accent);
+      color: var(--accent-fg);
+      outline: none;
+    }
+    .tip::after {
+      content: attr(data-tip);
+      position: absolute;
+      bottom: calc(100% + 8px);
+      left: 0;
+      width: 200px;
+      background: var(--panel);
+      color: var(--text);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 8px 10px;
+      font-size: 11px;
+      font-weight: 500;
+      line-height: 1.4;
+      font-style: normal;
+      white-space: normal;
+      text-align: left;
+      pointer-events: none;
+      opacity: 0;
+      transform: translateY(4px);
+      transition: opacity 0.15s ease, transform 0.15s ease;
+      z-index: 20;
+      box-shadow: 0 6px 20px rgba(0,0,0,0.35);
+    }
+    .tip::before {
+      content: '';
+      position: absolute;
+      bottom: calc(100% + 2px);
+      left: 6px;
+      border: 5px solid transparent;
+      border-top-color: var(--border);
+      pointer-events: none;
+      opacity: 0;
+      transition: opacity 0.15s ease;
+      z-index: 21;
+    }
+    .tip:hover::after, .tip:focus::after { opacity: 1; transform: translateY(0); }
+    .tip:hover::before, .tip:focus::before { opacity: 1; }
+    /* Right-edge tooltips — flip to anchor from the right so they don't clip */
+    .tip.right::after { left: auto; right: 0; }
+    .tip.right::before { left: auto; right: 6px; }
+
+    [hidden] { display: none !important; }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="brand"><span class="logo">🥭</span> SyncoBeat</div>
+    <div id="status" class="status none">
+      <span class="dot"></span>
+      <span id="status-text">No video detected</span>
+    </div>
+  </header>
+
+  <div class="panel">
+    <div class="bpm-display">
+      <span id="bpm-value" class="bpm" role="button" tabindex="0" title="Click to type a tempo">120</span>
+      <input id="bpm-input" class="bpm-input" type="number" min="20" max="300" step="1" hidden aria-label="Tempo in BPM" />
+      <span class="unit">bpm</span>
+    </div>
+
+    <div class="beats" id="beats"></div>
+
+    <div class="slider-block">
+      <div class="slider-head">
+        <span class="label">Tempo<span class="tip" tabindex="0" data-tip="Beats per minute (20–300). Drag the slider, use − / + , click the big number to type, or TAP along with the song.">i</span></span>
+        <span class="quick-btns">
+          <button id="bpm-half" class="chip-mini" type="button" title="Halve the tempo">½×</button>
+          <button id="bpm-double" class="chip-mini" type="button" title="Double the tempo">2×</button>
+          <button id="tap-tempo" class="chip-mini tap" type="button" title="Tap along with the song to set the tempo">TAP</button>
+        </span>
+      </div>
+      <div class="slider-control">
+        <button class="nudge-btn" data-nudge="bpm-dec" type="button" aria-label="Decrease tempo">−</button>
+        <input id="bpm-slider" type="range" min="20" max="300" value="120" step="1" aria-label="Tempo" />
+        <button class="nudge-btn" data-nudge="bpm-inc" type="button" aria-label="Increase tempo">+</button>
+      </div>
+    </div>
+
+    <div class="row sig-row">
+      <label for="sig-select">Meter<span class="tip" tabindex="0" data-tip="Beats per bar, and an optional subdivision click (softer clicks between beats — 8ths, triplets, or 16ths).">i</span></label>
+      <div class="select-pair">
+        <select id="sig-select" aria-label="Time signature">
+          <option value="2">2/4</option>
+          <option value="3">3/4</option>
+          <option value="4">4/4</option>
+          <option value="5">5/4</option>
+          <option value="6">6/8</option>
+          <option value="7">7/8</option>
+        </select>
+        <select id="subdivision-select" aria-label="Subdivision">
+          <option value="1">Beats only</option>
+          <option value="2">+ 8ths</option>
+          <option value="3">+ Triplets</option>
+          <option value="4">+ 16ths</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="row sig-row">
+      <label for="click-sound-select">Click<span class="tip" tabindex="0" data-tip="The metronome's sound. The downbeat (accent) is always brighter than the other beats.">i</span></label>
+      <select id="click-sound-select">
+        <option value="original">Original</option>
+        <option value="woodblock">Woodblock</option>
+        <option value="clave">Clave</option>
+        <option value="softsine">Soft sine</option>
+      </select>
+    </div>
+
+    <div class="row accent-row">
+      <label>Accent<span class="tip" tabindex="0" data-tip="Which beat in the bar gets the louder click. Use + / − to shift it (e.g. syncopated accents). Turn the switch off to make every click the same.">i</span></label>
+      <div class="accent-controls">
+        <span id="bar-offset-display" class="accent-display">Beat 1</span>
+        <div class="bar-stepper">
+          <button id="bar-inc" class="nudge-btn nudge-btn-sm" type="button" aria-label="Shift accent up">+</button>
+          <button id="bar-dec" class="nudge-btn nudge-btn-sm" type="button" aria-label="Shift accent down">−</button>
+        </div>
+        <button id="accent-toggle" class="switch on" type="button" role="switch" aria-checked="true" aria-label="Toggle accent"></button>
+      </div>
+    </div>
+
+    <div class="preset-row">
+      <div id="preset-chips" class="preset-chips"></div>
+      <button id="preset-save" class="preset-save" type="button" title="Save the current tempo as a preset">+ Save</button>
+    </div>
+  </div>
+
+  <div class="panel">
+    <div class="row mode-row">
+      <label>Mode<span class="tip" tabindex="0" data-tip="Auto: locks the click to YouTube play/pause/seek. Manual: ignores the video — start the click yourself on beat 1 with the hotkey or the Start button, then optionally lock it to the video.">i</span></label>
+      <div class="mode-segments" id="mode-segments" role="tablist">
+        <button type="button" data-mode="auto" class="on" role="tab" aria-selected="true">Auto</button>
+        <button type="button" data-mode="manual" role="tab" aria-selected="false">Manual</button>
+      </div>
+    </div>
+
+    <div class="transport-row" id="transport-row" hidden>
+      <button id="transport-toggle" class="btn btn-primary" type="button">▶ Start</button>
+      <button id="lock-toggle" class="btn" type="button">Lock to video</button>
+    </div>
+
+    <div class="hotkey-row" id="hotkey-row" hidden>
+      <label>Start/stop<span class="tip" tabindex="0" data-tip="Press this key on the YouTube page, on beat 1, to start the click; again to stop. Click “Set” and press a key to rebind (Esc cancels).">i</span></label>
+      <span class="spacer"></span>
+      <span id="hotkey-badge" class="hotkey-badge" title="Click to rebind">B</span>
+      <button id="hotkey-set" class="hotkey-set" type="button">Set</button>
+    </div>
+    <div class="hotkey-row" id="lock-hotkey-row" hidden>
+      <label>Lock<span class="tip" tabindex="0" data-tip="While the manual click is running, press this to anchor it to the video at the current beat. Once locked, the click follows seek/pause/play. Press again to unlock.">i</span></label>
+      <span class="spacer"></span>
+      <span id="lock-hotkey-badge" class="hotkey-badge" title="Click to rebind">V</span>
+      <button id="lock-hotkey-set" class="hotkey-set" type="button">Set</button>
+    </div>
+
+    <div class="slider-block">
+      <div class="slider-head">
+        <span class="label">Click offset<span class="tip" tabindex="0" data-tip="Shifts the click earlier (−) or later (+) relative to the video, in milliseconds — for when the click feels ahead of or behind the drums (e.g. Bluetooth headphone latency). Applies in Auto and locked modes. Double-click the slider to reset.">i</span></span>
+        <span class="value" id="offset-value">0 ms</span>
+      </div>
+      <div class="slider-control">
+        <button class="nudge-btn" data-nudge="off-dec" type="button" aria-label="Click earlier">−</button>
+        <input id="offset-slider" type="range" min="-200" max="200" value="0" step="5" aria-label="Click offset in milliseconds" />
+        <button class="nudge-btn" data-nudge="off-inc" type="button" aria-label="Click later">+</button>
+      </div>
+    </div>
+
+    <div class="mode-caption" id="mode-caption">
+      <strong>Auto</strong> — click follows the video.
+    </div>
+  </div>
+
+  <div class="panel">
+    <div class="slider-block">
+      <div class="slider-head">
+        <span class="label">Volume<span class="tip" tabindex="0" data-tip="Click sound volume (0–100%). Double-click the slider to reset to 80%.">i</span></span>
+        <span class="value" id="volume-value">80%</span>
+      </div>
+      <div class="slider-control">
+        <button class="nudge-btn" data-nudge="vol-dec" type="button" aria-label="Decrease volume">−</button>
+        <input id="volume-slider" type="range" min="0" max="100" value="80" step="1" aria-label="Volume" />
+        <button class="nudge-btn" data-nudge="vol-inc" type="button" aria-label="Increase volume">+</button>
+      </div>
+    </div>
+    <footer>
+      <span class="enable-label">Metronome<span class="tip" tabindex="0" data-tip="Master on/off. When off, no clicks play even if the video is running.">i</span></span>
+      <button id="enable-toggle" class="switch on" type="button" role="switch" aria-checked="true" aria-label="Toggle metronome"></button>
+    </footer>
+  </div>
+
+  <script src="popup.js"></script>
+</body>
+</html>
