@@ -4,7 +4,29 @@
   <meta charset="utf-8" />
   <title>SyncoBeat</title>
   <style>
+    /* Theme has three states. The dark palette is the base; the light palette
+       is applied either by the OS preference (when the user has not chosen) or
+       by an explicit data-theme="light". Guarding the media query with
+       :not([data-theme="dark"]) is what lets an explicit dark choice win on a
+       light-mode OS — without it the query would override the user. */
     :root {
+      /* Type system. Two families only: one UI sans for everything, and one
+         mono reserved for values you read as data — tempo, timecodes, key
+         bindings — where tabular digits and a fixed advance width matter.
+         Sizes are a 5-step scale; anything not on it was an accident. */
+      --font-ui: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      --font-mono: ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, monospace;
+
+      --fs-display: 44px;  /* the BPM readout, and nothing else */
+      --fs-lg: 15px;       /* brand wordmark, section titles */
+      --fs-md: 13px;       /* body: labels, buttons, values */
+      --fs-sm: 11.5px;     /* secondary: captions, hints, chips */
+      --fs-xs: 9.5px;      /* eyebrow caps only, always with tracking */
+
+      --fw-regular: 500;
+      --fw-medium: 600;
+      --fw-bold: 700;
+
       /* Mango yellow-orange palette (dark) */
       --bg: #1a1408;
       --panel: #241c0f;
@@ -21,8 +43,10 @@
       --red: #ff6b5e;
       --grey: #7a6853;
     }
+
+    /* Light palette, defined once and referenced by both selectors below. */
     @media (prefers-color-scheme: light) {
-      :root {
+      :root:not([data-theme="dark"]) {
         --bg: #fff7e8;
         --panel: #ffffff;
         --text: #2b1d0f;
@@ -39,13 +63,56 @@
         --grey: #b39c7f;
       }
     }
+    :root[data-theme="light"] {
+      --bg: #fff7e8;
+      --panel: #ffffff;
+      --text: #2b1d0f;
+      --muted: #85705a;
+      --accent: #f7891a;
+      --accent-soft: #ffb347;
+      --accent-dim: #ffe2b8;
+      --accent-fg: #ffffff;
+      --border: #f2e4c9;
+      --track: #f2e4c9;
+      --green: #16a34a;
+      --amber: #d97706;
+      --red: #dc2626;
+      --grey: #b39c7f;
+    }
+
+    /* Theme picker: a three-way segmented control in the header. */
+    .theme-seg {
+      display: flex; gap: 1px;
+      background: var(--track);
+      border-radius: 7px;
+      padding: 2px;
+      flex: 0 0 auto;
+    }
+    .theme-seg button {
+      border: none; background: transparent;
+      color: var(--muted);
+      width: 24px; height: 20px;
+      border-radius: 5px;
+      display: inline-flex; align-items: center; justify-content: center;
+      cursor: pointer; padding: 0;
+      transition: background 0.15s ease, color 0.15s ease;
+    }
+    .theme-seg button:hover { color: var(--text); }
+    .theme-seg button.on {
+      background: var(--panel);
+      color: var(--accent);
+      box-shadow: 0 1px 2px rgba(0, 0, 0, 0.18);
+    }
+    .theme-seg svg { width: 13px; height: 13px; fill: currentColor; display: block; }
 
     *, *::before, *::after { box-sizing: border-box; }
     html, body {
       margin: 0;
       padding: 0;
       width: 340px;
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      font-family: var(--font-ui);
+      font-size: var(--fs-md);
+      -webkit-font-smoothing: antialiased;
       background: var(--bg);
       color: var(--text);
     }
@@ -59,18 +126,18 @@
       margin-bottom: 8px;
     }
     header .brand {
-      display: flex; align-items: center; gap: 8px;
-      font-weight: 700; font-size: 16px; letter-spacing: 0.2px;
+      display: flex; align-items: center;
+      font-weight: var(--fw-bold); font-size: var(--fs-lg);
+      letter-spacing: -0.01em;
       background: linear-gradient(90deg, var(--accent-soft), var(--accent));
       -webkit-background-clip: text; background-clip: text;
       color: transparent;
       flex: 0 0 auto;
     }
-    header .brand .logo { font-size: 18px; -webkit-text-fill-color: initial; }
 
     .status {
       display: flex; align-items: center; gap: 6px;
-      font-size: 12px; color: var(--muted);
+      font-size: var(--fs-sm); color: var(--muted);
       min-width: 0;
     }
     .status .dot {
@@ -101,8 +168,9 @@
       margin: 2px 0 6px;
     }
     .bpm-display .bpm {
-      font-size: 44px; font-weight: 800; line-height: 1;
-      letter-spacing: -1px;
+      font-size: var(--fs-display); font-weight: var(--fw-bold); line-height: 1;
+      letter-spacing: -0.03em;
+      font-variant-numeric: tabular-nums;
       background: linear-gradient(135deg, var(--accent-soft), var(--accent));
       -webkit-background-clip: text; background-clip: text;
       color: transparent;
@@ -112,8 +180,9 @@
     .bpm-display .bpm:focus-visible { outline: 2px solid var(--accent-soft); }
     .bpm-display .bpm-input {
       width: 120px;
-      font-size: 44px; font-weight: 800; line-height: 1;
-      letter-spacing: -1px;
+      font-size: var(--fs-display); font-weight: var(--fw-bold); line-height: 1;
+      letter-spacing: -0.03em;
+      font-variant-numeric: tabular-nums;
       text-align: center;
       background: transparent;
       color: var(--accent);
@@ -128,8 +197,9 @@
       -webkit-appearance: none; margin: 0;
     }
     .bpm-display .unit {
-      font-size: 13px; color: var(--muted);
-      text-transform: uppercase; letter-spacing: 1px;
+      font-size: var(--fs-xs); color: var(--muted);
+      font-weight: var(--fw-bold);
+      text-transform: uppercase; letter-spacing: 0.14em;
     }
 
     /* Slider block: label + value/quick buttons on top row, − slider + below */
@@ -139,13 +209,14 @@
       margin-bottom: 4px;
     }
     .slider-head .label {
-      font-size: 12px; color: var(--muted);
+      font-size: var(--fs-md); color: var(--muted);
       display: inline-flex; align-items: center;
     }
     .slider-head .value {
-      font-size: 12px; color: var(--text);
+      font-size: var(--fs-md); color: var(--text);
+      font-family: var(--font-mono);
       font-variant-numeric: tabular-nums;
-      font-weight: 600;
+      font-weight: var(--fw-medium);
     }
     .slider-control {
       display: flex; align-items: center; gap: 8px;
@@ -157,8 +228,8 @@
       color: var(--muted);
       border: 1px solid var(--border);
       border-radius: 6px;
-      padding: 2px 8px;
-      font-size: 11px; font-weight: 700;
+      padding: 3px 9px;
+      font-size: var(--fs-sm); font-weight: var(--fw-bold);
       cursor: pointer;
       line-height: 16px;
       user-select: none;
@@ -174,7 +245,7 @@
       margin: 8px 0;
     }
     .row > label {
-      font-size: 12px; color: var(--muted);
+      font-size: var(--fs-md); color: var(--muted);
       min-width: 60px;
       display: inline-flex; align-items: center;
     }
@@ -202,7 +273,7 @@
     select {
       background: var(--bg); color: var(--text);
       border: 1px solid var(--border); border-radius: 6px;
-      padding: 4px 8px; font-size: 13px;
+      padding: 4px 8px; font-size: var(--fs-md);
       max-width: 100%;
     }
     .select-pair {
@@ -245,7 +316,7 @@
       color: var(--text);
       border: 1px solid var(--border);
       border-radius: 6px;
-      font-size: 14px; font-weight: 700; line-height: 1;
+      font-size: var(--fs-md); font-weight: var(--fw-bold); line-height: 1;
       cursor: pointer;
       padding: 0;
       user-select: none;
@@ -259,10 +330,11 @@
       display: flex; align-items: center; gap: 6px; flex: 1; justify-content: flex-end;
     }
     .accent-row .accent-display {
-      font-size: 12px; color: var(--text);
+      font-size: var(--fs-md); color: var(--text);
       min-width: 52px; text-align: center;
+      font-family: var(--font-mono);
       font-variant-numeric: tabular-nums;
-      font-weight: 600;
+      font-weight: var(--fw-medium);
     }
     .bar-stepper {
       display: flex;
@@ -272,7 +344,7 @@
     .nudge-btn-sm {
       width: 22px; height: 18px;
       flex: 0 0 18px;
-      font-size: 11px;
+      font-size: var(--fs-sm);
       border-radius: 4px;
     }
 
@@ -281,14 +353,23 @@
       margin: 4px 0 2px;
     }
     .beat {
-      width: 15px; height: 15px; border-radius: 50%;
-      background: var(--border);
-      transition: background 0.08s linear, transform 0.08s linear;
+      width: 13px; height: 13px; border-radius: 50%;
+      background: transparent;
+      border: 1.5px solid var(--track);
+      box-sizing: border-box;
+      transition: background 0.08s linear, transform 0.08s linear,
+                  border-color 0.08s linear;
     }
-    .beat.active { background: var(--accent); transform: scale(1.2); }
+    .beat.accent { border-color: var(--grey); }
+    .beat.active {
+      background: var(--accent);
+      border-color: var(--accent);
+      transform: scale(1.25);
+    }
     .beat.accent.active {
       background: var(--accent-soft);
-      box-shadow: 0 0 8px rgba(255,198,87,0.6);
+      border-color: var(--accent-soft);
+      box-shadow: 0 0 8px rgba(255, 198, 87, 0.6);
     }
 
     .sig-row { justify-content: space-between; }
@@ -304,18 +385,19 @@
     .mode-segments button {
       border: none;
       background: transparent;
-      color: var(--muted);
+      color: var(--text);
       padding: 4px 14px;
       border-radius: 6px;
-      font-size: 12px; font-weight: 600;
+      font-size: var(--fs-md); font-weight: var(--fw-medium);
       cursor: pointer;
       transition: background 0.15s ease, color 0.15s ease;
       user-select: none;
     }
-    .mode-segments button:hover { color: var(--text); }
+    .mode-segments button:hover:not(.on) { background: var(--accent-dim); }
     .mode-segments button.on {
       background: linear-gradient(135deg, var(--accent-soft), var(--accent));
       color: var(--accent-fg);
+      font-weight: var(--fw-bold);
     }
 
     /* Manual transport (Start/Stop + Lock) */
@@ -330,19 +412,30 @@
       border: 1px solid var(--border);
       border-radius: 8px;
       padding: 7px 10px;
-      font-size: 12px; font-weight: 700;
+      font-size: var(--fs-md); font-weight: var(--fw-medium);
       cursor: pointer;
       user-select: none;
       transition: background 0.12s ease, color 0.12s ease, opacity 0.12s ease;
     }
     .btn:hover:not(:disabled) { background: var(--accent-dim); color: var(--accent); }
-    .btn:disabled { opacity: 0.4; cursor: not-allowed; }
+    .btn:disabled {
+      opacity: 1;
+      color: var(--grey);
+      border-color: var(--border);
+      background: transparent;
+      cursor: not-allowed;
+    }
     .btn-primary {
       background: linear-gradient(135deg, var(--accent-soft), var(--accent));
       color: var(--accent-fg);
       border-color: transparent;
     }
     .btn-primary:hover:not(:disabled) { background: var(--accent); color: var(--accent-fg); }
+    .btn-primary:disabled {
+      background: var(--track);
+      color: var(--grey);
+      border-color: transparent;
+    }
 
     /* Hotkey rows (Manual mode) */
     .hotkey-row {
@@ -350,7 +443,7 @@
       margin: 8px 0 4px;
     }
     .hotkey-row > label {
-      font-size: 12px; color: var(--muted);
+      font-size: var(--fs-md); color: var(--muted);
       min-width: 60px;
       display: inline-flex; align-items: center;
     }
@@ -362,9 +455,9 @@
       color: var(--text);
       border: 1px solid var(--border);
       border-radius: 6px;
-      font-family: "SF Mono", ui-monospace, Menlo, monospace;
-      font-size: 12px; font-weight: 700;
-      min-width: 54px; text-align: center;
+      font-family: var(--font-mono);
+      font-size: var(--fs-sm); font-weight: var(--fw-bold);
+      min-width: 56px; text-align: center;
       line-height: 18px;
       font-variant-numeric: tabular-nums;
       cursor: pointer;
@@ -401,16 +494,74 @@
       border: 1px solid var(--accent-dim);
       border-radius: 6px;
       padding: 3px 10px;
-      font-size: 11px; font-weight: 600;
+      font-size: var(--fs-sm); font-weight: var(--fw-medium);
       cursor: pointer;
       line-height: 18px;
       transition: background 0.1s ease;
     }
     .hotkey-set:hover { background: var(--accent-dim); }
 
+    /* Practice loop */
+    .loop-head {
+      display: flex; align-items: center; justify-content: space-between;
+      margin-bottom: 8px;
+    }
+    .loop-title {
+      font-size: var(--fs-lg); font-weight: var(--fw-bold); color: var(--text);
+      display: inline-flex; align-items: center;
+    }
+    .loop-state {
+      font-size: var(--fs-xs); font-weight: var(--fw-bold);
+      padding: 3px 9px; border-radius: 999px;
+      background: var(--track); color: var(--muted);
+      text-transform: uppercase; letter-spacing: 0.1em;
+    }
+    .loop-state.on { background: var(--accent-dim); color: var(--accent); }
+    .loop-marks {
+      display: flex; align-items: stretch; gap: 6px;
+      margin-bottom: 8px;
+    }
+    .loop-mark {
+      flex: 1;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 6px 8px;
+      text-align: center;
+    }
+    .loop-mark.set { border-color: var(--accent-dim); }
+    .loop-mark .tag {
+      display: block;
+      font-size: var(--fs-xs); font-weight: var(--fw-bold); letter-spacing: 0.12em;
+      color: var(--muted); text-transform: uppercase;
+    }
+    .loop-mark .time {
+      display: block;
+      font-family: var(--font-mono);
+      font-size: var(--fs-md); font-weight: var(--fw-bold); color: var(--text);
+      font-variant-numeric: tabular-nums;
+      line-height: 1.5;
+    }
+    .loop-mark.unset .time { color: var(--grey); }
+    .loop-arrow {
+      display: flex; align-items: center;
+      color: var(--muted); font-size: var(--fs-md);
+    }
+    .loop-actions { display: flex; gap: 6px; }
+    .loop-actions .btn { font-size: var(--fs-sm); padding: 7px 8px; }
+    .loop-hint {
+      font-size: var(--fs-sm); color: var(--muted);
+      line-height: 1.45; margin-top: 8px;
+    }
+    .loop-hint code {
+      font-family: var(--font-mono);
+      background: var(--track); color: var(--text);
+      padding: 1px 5px; border-radius: 4px; font-size: var(--fs-xs);
+    }
+
     .mode-caption {
-      font-size: 11px; color: var(--muted);
-      line-height: 1.35;
+      font-size: var(--fs-sm); color: var(--muted);
+      line-height: 1.45;
       margin-top: 2px;
     }
     .mode-caption strong { color: var(--text); }
@@ -420,7 +571,7 @@
       padding: 2px 2px 0;
     }
     footer .enable-label {
-      font-size: 13px; color: var(--text); font-weight: 600;
+      font-size: var(--fs-md); color: var(--muted);
       display: inline-flex; align-items: center;
     }
 
@@ -438,8 +589,8 @@
       min-height: 26px;
     }
     .preset-chips .empty {
-      font-size: 11px; color: var(--muted);
-      padding: 4px 2px; font-style: italic;
+      font-size: var(--fs-sm); color: var(--muted);
+      padding: 4px 2px;
     }
     .chip-wrap {
       position: relative;
@@ -451,8 +602,9 @@
       border: 1px solid var(--border);
       border-radius: 14px;
       padding: 4px 12px;
-      font-size: 12px; font-weight: 600;
+      font-size: var(--fs-sm); font-weight: var(--fw-medium);
       cursor: pointer;
+      font-family: var(--font-mono);
       font-variant-numeric: tabular-nums;
       transition: background 0.12s ease, color 0.12s ease, border-color 0.12s ease;
       user-select: none;
@@ -475,7 +627,7 @@
       background: var(--panel);
       color: var(--muted);
       border: 1px solid var(--border);
-      font-size: 10px; font-weight: 700; line-height: 1;
+      font-size: var(--fs-xs); font-weight: var(--fw-bold); line-height: 1;
       display: none;
       align-items: center; justify-content: center;
       cursor: pointer;
@@ -492,14 +644,15 @@
       color: var(--accent);
       border: 1px solid var(--accent-dim);
       border-radius: 14px;
-      padding: 4px 10px;
-      font-size: 11px; font-weight: 600;
+      padding: 4px 12px;
+      font-size: var(--fs-sm); font-weight: var(--fw-medium);
       cursor: pointer;
       flex: 0 0 auto;
+      white-space: nowrap;
       transition: background 0.1s ease;
     }
     .preset-save:hover:not(:disabled) { background: var(--accent-dim); }
-    .preset-save:disabled { opacity: 0.4; cursor: not-allowed; }
+    .preset-save:disabled { color: var(--grey); cursor: not-allowed; }
 
     /* Info-icon hover tooltips */
     .tip {
@@ -508,13 +661,14 @@
       border-radius: 50%;
       background: var(--track);
       color: var(--muted);
-      font-size: 10px; font-weight: 700;
+      font-size: var(--fs-xs);
+      font-weight: var(--fw-bold);
+      line-height: 1;
       align-items: center; justify-content: center;
       cursor: help;
       margin-left: 5px;
       position: relative;
-      font-family: Georgia, serif;
-      font-style: italic;
+      font-family: var(--font-ui);
       user-select: none;
       transition: background 0.12s ease, color 0.12s ease;
     }
@@ -533,11 +687,10 @@
       color: var(--text);
       border: 1px solid var(--border);
       border-radius: 8px;
-      padding: 8px 10px;
-      font-size: 11px;
-      font-weight: 500;
-      line-height: 1.4;
-      font-style: normal;
+      padding: 9px 11px;
+      font-size: var(--fs-sm);
+      font-weight: var(--fw-regular);
+      line-height: 1.45;
       white-space: normal;
       text-align: left;
       pointer-events: none;
@@ -570,7 +723,7 @@
 </head>
 <body>
   <header>
-    <div class="brand"><span class="logo">🥭</span> SyncoBeat</div>
+    <div class="brand">SyncoBeat</div>
     <div id="status" class="status none">
       <span class="dot"></span>
       <span id="status-text">No video detected</span>
@@ -695,6 +848,51 @@
   </div>
 
   <div class="panel">
+    <div class="loop-head">
+      <span class="loop-title">Practice loop<span class="tip" tabindex="0" data-tip="Mark a passage and replay it. Press the mark key once to set the in point, again to set the out point — then the video loops that stretch until you clear it. The jump key replays from the in point at any time. Works in both Auto and Manual mode.">i</span></span>
+      <span class="loop-state" id="loop-state">Off</span>
+    </div>
+
+    <div class="loop-marks">
+      <div class="loop-mark unset" id="loop-mark-a">
+        <span class="tag">In</span>
+        <span class="time" id="loop-time-a">—:—</span>
+      </div>
+      <span class="loop-arrow">→</span>
+      <div class="loop-mark unset" id="loop-mark-b">
+        <span class="tag">Out</span>
+        <span class="time" id="loop-time-b">—:—</span>
+      </div>
+    </div>
+
+    <div class="loop-actions">
+      <button id="loop-mark" class="btn btn-primary" type="button">◉ Set in</button>
+      <button id="loop-jump" class="btn" type="button">⤺ Replay</button>
+      <button id="loop-clear" class="btn" type="button">Clear</button>
+    </div>
+
+    <div class="hotkey-row" id="loop-mark-hotkey-row">
+      <label>Mark<span class="tip" tabindex="0" data-tip="Press on the YouTube page to set the in point, then again for the out point; a third press starts a new in point. Hold Shift with this key to clear the loop.">i</span></label>
+      <span class="spacer"></span>
+      <span id="loop-mark-hotkey-badge" class="hotkey-badge" title="Click to rebind">G</span>
+      <button id="loop-mark-hotkey-set" class="hotkey-set" type="button">Set</button>
+    </div>
+    <div class="hotkey-row" id="loop-jump-hotkey-row">
+      <label>Replay<span class="tip" tabindex="0" data-tip="Press on the YouTube page to jump the playhead straight back to the in point. Works with only an in point set — mark the spot, then press this every time you want to run the passage again.">i</span></label>
+      <span class="spacer"></span>
+      <span id="loop-jump-hotkey-badge" class="hotkey-badge" title="Click to rebind">H</span>
+      <button id="loop-jump-hotkey-set" class="hotkey-set" type="button">Set</button>
+    </div>
+
+    <div class="row" style="margin-top:8px">
+      <label>On-screen info<span class="tip" tabindex="0" data-tip="Shows loop and beat-lock state on the YouTube player itself: brief confirmations when you press a hotkey, a status chip, and the loop range drawn on the progress bar.">i</span></label>
+      <button id="overlay-toggle" class="switch on" type="button" role="switch" aria-checked="true" aria-label="Toggle on-screen info"></button>
+    </div>
+
+    <div class="loop-hint" id="loop-hint"></div>
+  </div>
+
+  <div class="panel">
     <div class="slider-block">
       <div class="slider-head">
         <span class="label">Volume<span class="tip" tabindex="0" data-tip="Click sound volume (0–100%). Double-click the slider to reset to 80%.">i</span></span>
@@ -706,6 +904,21 @@
         <button class="nudge-btn" data-nudge="vol-inc" type="button" aria-label="Increase volume">+</button>
       </div>
     </div>
+    <div class="row" style="margin-top:8px">
+      <label>Theme<span class="tip" tabindex="0" data-tip="Match your system appearance, or force dark or light for the popup.">i</span></label>
+      <div class="theme-seg" id="theme-seg" role="group" aria-label="Theme">
+        <button type="button" data-theme-choice="system" title="Match system" aria-label="Match system">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 5.5A2.5 2.5 0 0 1 5.5 3h13A2.5 2.5 0 0 1 21 5.5v9a2.5 2.5 0 0 1-2.5 2.5h-13A2.5 2.5 0 0 1 3 14.5zm2.5-.5a.5.5 0 0 0-.5.5v9a.5.5 0 0 0 .5.5h13a.5.5 0 0 0 .5-.5v-9a.5.5 0 0 0-.5-.5zM8 19h8a1 1 0 0 1 0 2H8a1 1 0 0 1 0-2z"/></svg>
+        </button>
+        <button type="button" data-theme-choice="dark" title="Dark" aria-label="Dark">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M13.2 3.1a.9.9 0 0 1 .5 1.2 6.8 6.8 0 0 0 8.6 8.9.9.9 0 0 1 1.1 1.2A9.8 9.8 0 1 1 12 2.2c.4 0 .8.3 1.2.9z"/></svg>
+        </button>
+        <button type="button" data-theme-choice="light" title="Light" aria-label="Light">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 6.5a5.5 5.5 0 1 0 0 11 5.5 5.5 0 0 0 0-11zM12 1a1 1 0 0 1 1 1v1.6a1 1 0 0 1-2 0V2a1 1 0 0 1 1-1zm0 18.4a1 1 0 0 1 1 1V22a1 1 0 0 1-2 0v-1.6a1 1 0 0 1 1-1zM2 12a1 1 0 0 1 1-1h1.6a1 1 0 0 1 0 2H3a1 1 0 0 1-1-1zm17.4 0a1 1 0 0 1 1-1H22a1 1 0 0 1 0 2h-1.6a1 1 0 0 1-1-1zM4.9 4.9a1 1 0 0 1 1.4 0l1.2 1.2a1 1 0 1 1-1.4 1.4L4.9 6.3a1 1 0 0 1 0-1.4zm11.6 11.6a1 1 0 0 1 1.4 0l1.2 1.2a1 1 0 1 1-1.4 1.4l-1.2-1.2a1 1 0 0 1 0-1.4zm2.6-11.6a1 1 0 0 1 0 1.4l-1.2 1.2a1 1 0 1 1-1.4-1.4l1.2-1.2a1 1 0 0 1 1.4 0zM7.5 16.5a1 1 0 0 1 0 1.4l-1.2 1.2a1 1 0 1 1-1.4-1.4l1.2-1.2a1 1 0 0 1 1.4 0z"/></svg>
+        </button>
+      </div>
+    </div>
+
     <footer>
       <span class="enable-label">Metronome<span class="tip" tabindex="0" data-tip="Master on/off. When off, no clicks play even if the video is running.">i</span></span>
       <button id="enable-toggle" class="switch on" type="button" role="switch" aria-checked="true" aria-label="Toggle metronome"></button>

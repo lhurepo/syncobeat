@@ -40,7 +40,35 @@ const els = {
   hotkeySet: document.getElementById('hotkey-set'),
   lockHotkeyRow: document.getElementById('lock-hotkey-row'),
   lockHotkeyBadge: document.getElementById('lock-hotkey-badge'),
-  lockHotkeySet: document.getElementById('lock-hotkey-set')
+  lockHotkeySet: document.getElementById('lock-hotkey-set'),
+  loopState: document.getElementById('loop-state'),
+  loopMarkA: document.getElementById('loop-mark-a'),
+  loopMarkB: document.getElementById('loop-mark-b'),
+  loopTimeA: document.getElementById('loop-time-a'),
+  loopTimeB: document.getElementById('loop-time-b'),
+  loopMarkBtn: document.getElementById('loop-mark'),
+  loopJumpBtn: document.getElementById('loop-jump'),
+  loopClearBtn: document.getElementById('loop-clear'),
+  loopMarkHotkeyBadge: document.getElementById('loop-mark-hotkey-badge'),
+  loopMarkHotkeySet: document.getElementById('loop-mark-hotkey-set'),
+  loopJumpHotkeyBadge: document.getElementById('loop-jump-hotkey-badge'),
+  loopJumpHotkeySet: document.getElementById('loop-jump-hotkey-set'),
+  overlayToggle: document.getElementById('overlay-toggle'),
+  loopHint: document.getElementById('loop-hint'),
+  themeSeg: document.getElementById('theme-seg')
+};
+
+const THEMES = new Set(['system', 'dark', 'light']);
+
+// Every rebindable slot, in one place: the capture UI rejects a key already
+// bound to any *other* slot, so this list is the conflict domain.
+const HOTKEY_SLOTS = ['hotkey', 'lockHotkey', 'loopMarkHotkey', 'loopJumpHotkey'];
+
+const HOTKEY_ELS = {
+  hotkey: () => ({ badge: els.hotkeyBadge, set: els.hotkeySet }),
+  lockHotkey: () => ({ badge: els.lockHotkeyBadge, set: els.lockHotkeySet }),
+  loopMarkHotkey: () => ({ badge: els.loopMarkHotkeyBadge, set: els.loopMarkHotkeySet }),
+  loopJumpHotkey: () => ({ badge: els.loopJumpHotkeyBadge, set: els.loopJumpHotkeySet })
 };
 
 const MAX_PRESETS = 8;
@@ -68,6 +96,10 @@ function sanitizeSettings(raw) {
     mode: r.mode === 'manual' ? 'manual' : 'auto',
     hotkey: str(r.hotkey, 'KeyB'),
     lockHotkey: str(r.lockHotkey, 'KeyV'),
+    loopMarkHotkey: str(r.loopMarkHotkey, 'KeyG'),
+    loopJumpHotkey: str(r.loopJumpHotkey, 'KeyH'),
+    overlayEnabled: typeof r.overlayEnabled === 'boolean' ? r.overlayEnabled : true,
+    theme: THEMES.has(r.theme) ? r.theme : 'system',
     presets: sanitizePresets(r.presets)
   };
 }
@@ -98,7 +130,9 @@ const live = {
   locked: false,
   videoPresent: false,
   videoPlaying: false,
-  adShowing: false
+  adShowing: false,
+  loopA: null,
+  loopB: null
 };
 
 let port = null;
@@ -160,6 +194,7 @@ async function connect() {
     live.connected = false;
     renderStatus();
     renderTransport();
+    renderLoop();
     scheduleReconnect();
   });
 }
@@ -187,9 +222,12 @@ function onPortMessage(msg) {
     live.videoPresent = !!msg.videoPresent;
     live.videoPlaying = !!msg.videoPlaying;
     live.adShowing = !!msg.adShowing;
+    live.loopA = typeof msg.loopA === 'number' ? msg.loopA : null;
+    live.loopB = typeof msg.loopB === 'number' ? msg.loopB : null;
     renderStatus();
     renderTransport();
     renderModeCaption();
+    renderLoop();
     if (!live.isPlaying) flashBeat(0);
   }
 }
@@ -324,7 +362,7 @@ function renderPresets() {
 
   const already = s.presets.includes(s.bpm);
   const full = s.presets.length >= MAX_PRESETS;
-  els.presetSave.textContent = `+ Save ${s.bpm}`;
+  els.presetSave.textContent = '+ Save';
   els.presetSave.disabled = already || full;
   if (full && !already) els.presetSave.title = `Limit ${MAX_PRESETS} presets — delete one first.`;
   else if (already) els.presetSave.title = 'Already saved.';
@@ -366,9 +404,29 @@ function renderModeCaption() {
   }
 }
 
+// 'system' leaves the attribute off entirely, so the prefers-color-scheme
+// media query in the stylesheet is what decides. An explicit choice stamps the
+// attribute and wins in both directions.
+function applyTheme() {
+  const root = document.documentElement;
+  if (s.theme === 'system') root.removeAttribute('data-theme');
+  else root.setAttribute('data-theme', s.theme);
+}
+
+function renderTheme() {
+  applyTheme();
+  for (const btn of els.themeSeg.querySelectorAll('button')) {
+    const on = btn.dataset.themeChoice === s.theme;
+    btn.classList.toggle('on', on);
+    btn.setAttribute('aria-pressed', on ? 'true' : 'false');
+  }
+}
+
 function renderHotkey() {
-  renderHotkeyBadge('hotkey', els.hotkeyBadge, els.hotkeySet, s.hotkey);
-  renderHotkeyBadge('lockHotkey', els.lockHotkeyBadge, els.lockHotkeySet, s.lockHotkey);
+  for (const slot of HOTKEY_SLOTS) {
+    const { badge, set } = HOTKEY_ELS[slot]();
+    renderHotkeyBadge(slot, badge, set, s[slot]);
+  }
 }
 
 function renderHotkeyBadge(target, badge, setBtn, code) {
@@ -381,6 +439,52 @@ function renderHotkeyBadge(target, badge, setBtn, code) {
     badge.classList.remove('capturing');
     setBtn.textContent = 'Set';
   }
+}
+
+// --- Practice loop ----------------------------------------------------------
+// Mirrors the content script's cycle so the button label always names what the
+// next press will actually do.
+function renderLoop() {
+  const hasA = live.loopA !== null;
+  const hasB = live.loopB !== null;
+  const ready = live.connected && live.videoPresent;
+
+  els.loopTimeA.textContent = hasA ? fmtTime(live.loopA) : '—:—';
+  els.loopTimeB.textContent = hasB ? fmtTime(live.loopB) : '—:—';
+  els.loopMarkA.className = 'loop-mark' + (hasA ? ' set' : ' unset');
+  els.loopMarkB.className = 'loop-mark' + (hasB ? ' set' : ' unset');
+
+  els.loopState.textContent = hasB ? 'Looping' : (hasA ? 'In set' : 'Off');
+  els.loopState.classList.toggle('on', hasB);
+
+  els.loopMarkBtn.textContent = hasB ? '◉ New in' : (hasA ? '◉ Set out' : '◉ Set in');
+  els.loopMarkBtn.disabled = !ready;
+  els.loopJumpBtn.disabled = !ready || !hasA;
+  els.loopClearBtn.disabled = !ready || !hasA;
+
+  const mark = escapeHtml(hotkeyDisplayName(s.loopMarkHotkey));
+  const jump = escapeHtml(hotkeyDisplayName(s.loopJumpHotkey));
+  if (!live.connected) {
+    els.loopHint.innerHTML = 'Open a YouTube video to use the loop.';
+  } else if (hasB) {
+    els.loopHint.innerHTML =
+      `Looping. <code>${jump}</code> restarts the pass, <code>Shift</code>+<code>${mark}</code> clears it.`;
+  } else if (hasA) {
+    els.loopHint.innerHTML =
+      `Press <code>${mark}</code> again at the end of the passage to loop it, or <code>${jump}</code> to replay from the in point.`;
+  } else {
+    els.loopHint.innerHTML =
+      `Press <code>${mark}</code> on the page at the start of a passage, then again at the end.`;
+  }
+}
+
+function fmtTime(t) {
+  const total = Math.max(0, Math.floor(t));
+  const h = Math.floor(total / 3600);
+  const m = Math.floor((total % 3600) / 60);
+  const sec = total % 60;
+  const two = (n) => String(n).padStart(2, '0');
+  return h > 0 ? `${h}:${two(m)}:${two(sec)}` : `${m}:${two(sec)}`;
 }
 
 function renderAll() {
@@ -396,6 +500,9 @@ function renderAll() {
   renderPresets();
   renderMode();
   renderHotkey();
+  setSwitch(els.overlayToggle, s.overlayEnabled);
+  renderTheme();
+  renderLoop();
   renderStatus();
 }
 
@@ -474,9 +581,9 @@ function endBpmEdit(commit) {
 }
 
 // --- Hotkey capture ---------------------------------------------------------------------
-// One capture session at a time; `captureTarget` is 'hotkey' or 'lockHotkey'.
+// One capture session at a time; `captureTarget` is one of HOTKEY_SLOTS.
 // Next non-modifier keydown commits, Escape cancels, a key already bound to
-// the other slot is rejected with a red flash (capture stays active).
+// any other slot is rejected with a red flash (capture stays active).
 let captureTarget = null;
 let captureCleanup = null;
 
@@ -485,14 +592,36 @@ const MODIFIER_CODES = new Set([
   'AltLeft', 'AltRight', 'MetaLeft', 'MetaRight', 'OSLeft', 'OSRight'
 ]);
 
+// Keys YouTube itself owns on the watch page. Binding one would either shadow
+// a player shortcut the user still wants or silently lose to it, so the
+// capture refuses them outright rather than leaving the user to discover the
+// clash mid-practice.
+const RESERVED_CODES = new Set([
+  'KeyK', 'KeyJ', 'KeyL', 'KeyM', 'KeyF', 'KeyT', 'KeyC', 'KeyI', 'KeyO',
+  'KeyN', 'KeyP', 'KeyA', 'KeyS', 'KeyD', 'KeyW',
+  'Space', 'Enter', 'Tab', 'Escape',
+  'ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown',
+  'Home', 'End', 'Comma', 'Period', 'Slash',
+  'Digit0', 'Digit1', 'Digit2', 'Digit3', 'Digit4',
+  'Digit5', 'Digit6', 'Digit7', 'Digit8', 'Digit9'
+]);
+
+function rejectCapture(target, badge, label) {
+  badge.textContent = label;
+  badge.classList.add('error');
+  setTimeout(() => {
+    badge.classList.remove('error');
+    if (captureTarget === target) badge.textContent = 'Press a key…';
+  }, 700);
+}
+
 function startHotkeyCapture(target) {
   if (captureTarget && captureTarget !== target) endHotkeyCapture(false);
   if (captureTarget === target) return;
   captureTarget = target;
   renderHotkey();
 
-  const badge = target === 'hotkey' ? els.hotkeyBadge : els.lockHotkeyBadge;
-  const otherCode = target === 'hotkey' ? s.lockHotkey : s.hotkey;
+  const { badge } = HOTKEY_ELS[target]();
 
   const handler = (e) => {
     e.preventDefault();
@@ -504,13 +633,13 @@ function startHotkeyCapture(target) {
     }
     if (MODIFIER_CODES.has(e.code)) return;
     if (typeof e.code !== 'string' || e.code.length === 0) return;
-    if (e.code === otherCode) {
-      badge.textContent = 'In use';
-      badge.classList.add('error');
-      setTimeout(() => {
-        badge.classList.remove('error');
-        if (captureTarget === target) badge.textContent = 'Press a key…';
-      }, 600);
+    const takenBy = HOTKEY_SLOTS.find((slot) => slot !== target && s[slot] === e.code);
+    if (takenBy) {
+      rejectCapture(target, badge, 'In use');
+      return;
+    }
+    if (RESERVED_CODES.has(e.code)) {
+      rejectCapture(target, badge, 'YouTube');
       return;
     }
     endHotkeyCapture(true, e.code);
@@ -528,7 +657,7 @@ function endHotkeyCapture(save, code) {
   if (captureCleanup) captureCleanup();
   captureTarget = null;
   if (save && typeof code === 'string' && code.length > 0 && target) {
-    const badge = target === 'hotkey' ? els.hotkeyBadge : els.lockHotkeyBadge;
+    const { badge } = HOTKEY_ELS[target]();
     s[target] = code;
     write({ [target]: code }, true);
     badge.classList.add('confirmed');
@@ -536,6 +665,7 @@ function endHotkeyCapture(save, code) {
   }
   renderHotkey();
   renderModeCaption();
+  renderLoop();
   renderStatus();
 }
 
@@ -656,8 +786,30 @@ function wireControls() {
   els.transportToggle.addEventListener('click', () => sendCommand('MANUAL_TOGGLE'));
   els.lockToggle.addEventListener('click', () => sendCommand('TOGGLE_LOCK'));
 
-  wireHotkeyCapture('hotkey', els.hotkeySet, els.hotkeyBadge);
-  wireHotkeyCapture('lockHotkey', els.lockHotkeySet, els.lockHotkeyBadge);
+  for (const slot of HOTKEY_SLOTS) {
+    const { badge, set } = HOTKEY_ELS[slot]();
+    wireHotkeyCapture(slot, set, badge);
+  }
+
+  els.loopMarkBtn.addEventListener('click', () => sendCommand('LOOP_MARK'));
+  els.loopJumpBtn.addEventListener('click', () => sendCommand('LOOP_JUMP'));
+  els.loopClearBtn.addEventListener('click', () => sendCommand('LOOP_CLEAR'));
+
+  els.themeSeg.addEventListener('click', (e) => {
+    const btn = e.target.closest('button[data-theme-choice]');
+    if (!btn) return;
+    const choice = btn.dataset.themeChoice;
+    if (!THEMES.has(choice) || choice === s.theme) return;
+    s.theme = choice;
+    renderTheme();
+    write({ theme: choice }, true);
+  });
+
+  els.overlayToggle.addEventListener('click', () => {
+    s.overlayEnabled = !s.overlayEnabled;
+    setSwitch(els.overlayToggle, s.overlayEnabled);
+    write({ overlayEnabled: s.overlayEnabled }, true);
+  });
 }
 
 function wireHotkeyCapture(target, setBtn, badge) {
@@ -687,6 +839,9 @@ async function init() {
   let stored = {};
   try { stored = await chrome.storage.local.get(null); } catch (_) { /* noop */ }
   s = sanitizeSettings(stored);
+  // Paint the palette before anything else: renderAll() does far more work,
+  // and doing the theme last would show a frame of the wrong colours.
+  applyTheme();
   renderAll();
   wireControls();
   connect();

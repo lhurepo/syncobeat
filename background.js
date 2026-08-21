@@ -18,6 +18,10 @@ const DEFAULTS = {
   mode: 'auto',
   hotkey: 'KeyB',
   lockHotkey: 'KeyV',
+  loopMarkHotkey: 'KeyG',
+  loopJumpHotkey: 'KeyH',
+  overlayEnabled: true,
+  theme: 'system',
   presets: [60, 90, 120, 160]
 };
 
